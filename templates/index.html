@@ -2,114 +2,109 @@
 <html lang="bg">
 <head>
   <meta charset="UTF-8">
-  <title>Trading Bot Pro</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>Търговски сигнали</title>
   <style>
-    body { background:#0a0a0a; color:#fff; font-family:Arial; text-align:center; }
-    .signal { font-size:48px; font-weight:bold; margin:20px; text-shadow:0 0 20px #0ff; }
-    .buy { color:#00ff00; text-shadow:0 0 20px #00ff00; }
-    .sell { color:#ff4444; text-shadow:0 0 20px #ff4444; }
-    .none { color:#aaa; }
-    .stats { margin:20px; font-size:18px; }
-    .history { margin:20px auto; width:300px; text-align:left; background:#111; border:1px solid #333; padding:10px; border-radius:8px; }
-    .btn { background:#111; border:1px solid #0ff; color:#0ff; padding:8px 12px; margin:5px; cursor:pointer; border-radius:6px; }
-    .btn:hover { background:#0ff; color:#000; }
-    #timer { margin:10px; font-size:16px; color:#0ff; }
-    .panel { margin:20px auto; width:80%; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f9;
+      color: #333;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    #signal {
+      font-size: 2em;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+    #countdown {
+      font-size: 1.5em;
+      color: #555;
+    }
+    #history {
+      margin-top: 30px;
+      text-align: left;
+      display: inline-block;
+    }
+    .buy {
+      color: green;
+      font-weight: bold;
+    }
+    .sell {
+      color: red;
+      font-weight: bold;
+    }
+    .none {
+      color: gray;
+    }
   </style>
 </head>
 <body>
-  <h1>⚡ Trading Bot Pro ⚡</h1>
+  <h1>📊 Дашборд за сигнали</h1>
+
   <div>
-    {% for a in assets %}
-      <button class="btn" onclick="changeAsset('{{a}}')">{{a}}</button>
-    {% endfor %}
-    <button class="btn" onclick="loadData()">🔄 Обнови</button>
-  </div>
-  <div id="signal" class="signal none">---</div>
-  <div class="stats" id="stats"></div>
-  <div id="timer">Обновяване след: 60 сек.</div>
-
-  <!-- Pocket Option бутон -->
-  <div class="panel">
-    <h2 style="color:#0ff;">Pocket Option</h2>
-    <button class="btn" onclick="openPocket()">Отвори Pocket Option</button>
+    <div>Сигнал:</div>
+    <div id="signal" class="none">NONE</div>
+    <div>⏳ Обратно броене: <span id="countdown">20</span> сек</div>
   </div>
 
-  <!-- Цена + EMA -->
-  <div class="panel"><canvas id="priceChart"></canvas></div>
-  <!-- RSI -->
-  <div class="panel"><canvas id="rsiChart"></canvas></div>
-  <!-- MACD -->
-  <div class="panel"><canvas id="macdChart"></canvas></div>
-  <!-- ATR -->
-  <div class="panel"><canvas id="atrChart"></canvas></div>
-
-  <div class="history">
-    <h3>История на сигналите</h3>
-    <ul id="history"></ul>
+  <div id="history">
+    <h2>История</h2>
+    <ul id="history-list"></ul>
   </div>
 
   <script>
-    let priceChart = new Chart(document.getElementById('priceChart'), {
-      type:'line', data:{labels:[],datasets:[
-        {label:'Цена',data:[],borderColor:'#0ff'},
-        {label:'EMA5',data:[],borderColor:'#0f0'},
-        {label:'EMA20',data:[],borderColor:'#f00'}
-      ]}, options:{plugins:{legend:{labels:{color:'#fff'}}},scales:{x:{ticks:{color:'#fff'}},y:{ticks:{color:'#fff'}}}}
-    });
+    let countdown = 20;
 
-    let rsiChart = new Chart(document.getElementById('rsiChart'), {
-      type:'line', data:{labels:[],datasets:[{label:'RSI',data:[],borderColor:'#ff0'}]},
-      options:{plugins:{legend:{labels:{color:'#fff'}}},scales:{x:{ticks:{color:'#fff'}},y:{min:0,max:100,ticks:{color:'#fff'}}}}
-    });
+    function fetchSignal() {
+      fetch("/api/signal")
+        .then(res => res.json())
+        .then(data => {
+          let signalEl = document.getElementById("signal");
 
-    let macdChart = new Chart(document.getElementById('macdChart'), {
-      type:'line', data:{labels:[],datasets:[
-        {label:'MACD',data:[],borderColor:'#0ff'},
-        {label:'Signal',data:[],borderColor:'#ff0'}
-      ]}, options:{plugins:{legend:{labels:{color:'#fff'}}},scales:{x:{ticks:{color:'#fff'}},y:{ticks:{color:'#fff'}}}}
-    });
+          if (data.signal === "BUY") {
+            signalEl.innerText = "BUY ⬆️";
+            signalEl.className = "buy";
+          } else if (data.signal === "SELL") {
+            signalEl.innerText = "SELL ⬇️";
+            signalEl.className = "sell";
+          } else {
+            signalEl.innerText = "NONE";
+            signalEl.className = "none";
+          }
 
-    let atrChart = new Chart(document.getElementById('atrChart'), {
-      type:'line', data:{labels:[],datasets:[{label:'ATR',data:[],borderColor:'#f0f'}]},
-      options:{plugins:{legend:{labels:{color:'#fff'}}},scales:{x:{ticks:{color:'#fff'}},y:{ticks:{color:'#fff'}}}}
-    });
+          // История
+          let historyEl = document.getElementById("history-list");
+          historyEl.innerHTML = "";
+          data.history.forEach(item => {
+            let li = document.createElement("li");
+            if (item.includes("BUY")) {
+              li.innerHTML = `<span class="buy">${item} ⬆️</span>`;
+            } else if (item.includes("SELL")) {
+              li.innerHTML = `<span class="sell">${item} ⬇️</span>`;
+            } else {
+              li.innerHTML = `<span class="none">${item}</span>`;
+            }
+            historyEl.appendChild(li);
+          });
 
-    let asset = "{{assets[0]}}";
-    let timer = 60;
-
-    async function loadData() {
-      let res = await fetch(`/api/signal?asset=${asset}`);
-      let data = await res.json();
-
-      let s=document.getElementById("signal");
-      s.textContent=data.signal;
-      s.className="signal " + (data.signal==="BUY"?"buy":data.signal==="SELL"?"sell":"none");
-
-      document.getElementById("stats").textContent=
-        `Актив: ${data.asset} | Win: ${data.stats.win} | Loss: ${data.stats.loss} | Accuracy: ${data.stats.accuracy}`;
-
-      let hist=document.getElementById("history"); hist.innerHTML="";
-      data.history.forEach(h=>{let li=document.createElement("li");li.textContent=h;hist.appendChild(li);});
-
-      priceChart.data.labels=rsiChart.data.labels=macdChart.data.labels=atrChart.data.labels=data.chart.labels;
-      priceChart.data.datasets[0].data=data.chart.close;
-      priceChart.data.datasets[1].data=data.chart.ema5;
-      priceChart.data.datasets[2].data=data.chart.ema20;
-      rsiChart.data.datasets[0].data=data.chart.rsi;
-      macdChart.data.datasets[0].data=data.chart.macd;
-      macdChart.data.datasets[1].data=data.chart.macd_signal;
-      atrChart.data.datasets[0].data=data.chart.atr;
-      priceChart.update(); rsiChart.update(); macdChart.update(); atrChart.update();
+          countdown = 20; // рестарт на таймера
+        })
+        .catch(err => console.error("Грешка при взимане на сигнал:", err));
     }
 
-    function changeAsset(a){ asset=a; loadData(); }
-    function openPocket(){ window.open("https://pocketoption.com", "_blank", "width=1200,height=800"); }
+    setInterval(() => {
+      countdown--;
+      if (countdown <= 0) {
+        fetchSignal();
+      }
+      document.getElementById("countdown").innerText = countdown;
+    }, 1000);
 
-    setInterval(()=>{timer--; if(timer<=0){timer=60;loadData();} document.getElementById("timer").textContent=`Обновяване след: ${timer} сек.`;},1000);
-
-    loadData();
+    // първоначално извикване
+    fetchSignal();
   </script>
 </body>
 </html>
